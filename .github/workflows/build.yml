@@ -52,10 +52,13 @@ jobs:
             FRAPPE_PATH=https://github.com/frappe/frappe
             FRAPPE_BRANCH=version-16
             APPS_JSON_BASE64=${{ steps.b64.outputs.value }}
-          load: true
+          outputs: type=docker,dest=/tmp/erpnext-uz.tar
           tags: erpnext-uz:latest
           cache-from: type=gha,scope=erpnext-uz
           cache-to: type=gha,scope=erpnext-uz,mode=max
+
+      - name: Load base image
+        run: docker load --input /tmp/erpnext-uz.tar
 
       # Step 2 — Apply SaparERP branding + UZ customizations
       - name: Build & push SaparERP image
