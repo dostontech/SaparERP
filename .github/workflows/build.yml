@@ -1,4 +1,4 @@
-name: Build & Push SaparERP to Docker Hub
+name: Build & Push SaparERP Image
 
 on:
   push:
@@ -13,10 +13,16 @@ on:
       - ".github/workflows/build.yml"
   workflow_dispatch:
 
+env:
+  IMAGE: ghcr.io/dostontech/saparerp
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write   # needed to push to ghcr.io
 
     steps:
       - name: Checkout
@@ -25,17 +31,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Encode apps-uz.json to base64
+      - name: Encode apps-uz.json
         id: b64
         run: echo "value=$(base64 -w 0 apps-uz.json)" >> $GITHUB_OUTPUT
 
-      # Step 1: Build base image with frappe + erpnext + hrms (~40 min first time, cached after)
+      # Step 1 — Build base image: frappe + erpnext + hrms (~40 min, cached after)
       - name: Build base image erpnext-uz
         uses: docker/build-push-action@v6
         with:
@@ -50,18 +57,24 @@ jobs:
           cache-from: type=gha,scope=erpnext-uz
           cache-to: type=gha,scope=erpnext-uz,mode=max
 
-      # Step 2: Apply SaparERP customizations on top
-      - name: Build SaparERP image
+      # Step 2 — Apply SaparERP branding + UZ customizations
+      - name: Build & push SaparERP image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.uz
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/saparerp:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/saparerp:v16
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:v16
           cache-from: type=gha,scope=saparerp
           cache-to: type=gha,scope=saparerp,mode=max
 
-      - name: Print image name
-        run: echo "Pushed ${{ secrets.DOCKERHUB_USERNAME }}/saparerp:latest to Docker Hub"
+      - name: Summary
+        run: |
+          echo "### Image pushed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ env.IMAGE }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "${{ env.IMAGE }}:v16" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "Use this in Railway: SAPAR_IMAGE=${{ env.IMAGE }}:latest" >> $GITHUB_STEP_SUMMARY
