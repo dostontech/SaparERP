@@ -72,6 +72,7 @@ jobs:
             ${{ env.IMAGE }}:v16
           cache-from: type=gha,scope=saparerp
           cache-to: type=gha,scope=saparerp,mode=max
+          load: false
 
       - name: Summary
         run: |
