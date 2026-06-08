@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SaparERP — Translation Tool</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; }
+  .topbar { background: #171717; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  .topbar h1 { font-size: 16px; font-weight: 600; flex: 1; }
+  .topbar a { color: #aaa; font-size: 13px; text-decoration: none; }
+  .topbar a:hover { color: #fff; }
+  .toolbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .toolbar label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .5px; }
+  select, input[type=text] { border: 1px solid #d1d8dd; border-radius: 5px; padding: 7px 10px; font-size: 13px; outline: none; }
+  select:focus, input[type=text]:focus { border-color: #5e64ff; box-shadow: 0 0 0 2px rgba(94,100,255,.15); }
+  .btn { padding: 7px 16px; border-radius: 5px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+  .btn-primary { background: #5e64ff; color: #fff; }
+  .btn-primary:hover { background: #4b52e0; }
+  .btn-success { background: #2ea44f; color: #fff; }
+  .btn-success:hover { background: #268f44; }
+  .btn-default { background: #fff; border: 1px solid #d1d8dd; color: #333; }
+  .btn-default:hover { background: #f5f7fa; }
+  .btn-danger { background: #fff; border: 1px solid #e74c3c; color: #e74c3c; }
+  .btn-danger:hover { background: #fef3f2; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .stats { margin-left: auto; font-size: 12px; color: #666; white-space: nowrap; }
+  .stats span { font-weight: 700; color: #333; }
+  main { padding: 20px 24px; }
+  .card { background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #f8f9fa; border-bottom: 2px solid #e2e8f0; padding: 10px 14px; text-align: left; font-weight: 600; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: .4px; }
+  tbody tr { border-bottom: 1px solid #f0f2f5; transition: background .1s; }
+  tbody tr:hover { background: #f8f9ff; }
+  tbody tr.dirty { background: #fffde7; }
+  tbody tr.dirty:hover { background: #fff9c4; }
+  td { padding: 8px 14px; vertical-align: middle; }
+  td.src { color: #555; max-width: 420px; word-break: break-word; line-height: 1.4; }
+  td.src .lang-note { display: block; font-size: 11px; color: #aaa; margin-top: 2px; }
+  .trans-input { width: 100%; border: none; background: transparent; font-size: 13px; color: #333; padding: 4px 0; outline: none; }
+  .trans-input:focus { background: #fff; border-bottom: 2px solid #5e64ff; padding-bottom: 2px; }
+  td.actions { width: 70px; text-align: center; white-space: nowrap; }
+  .del-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 3px; }
+  .del-btn:hover { color: #e74c3c; background: #fef3f2; }
+  .empty { text-align: center; padding: 60px 20px; color: #aaa; font-size: 14px; }
+  .pager { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; border-top: 1px solid #f0f2f5; }
+  .pager button { width: 32px; height: 32px; border: 1px solid #d1d8dd; background: #fff; border-radius: 5px; cursor: pointer; font-size: 13px; }
+  .pager button.active { background: #5e64ff; color: #fff; border-color: #5e64ff; }
+  .pager button:hover:not(.active) { background: #f5f7fa; }
+  .pager .info { font-size: 12px; color: #666; margin: 0 8px; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-empty { background: #fff3cd; color: #856404; }
+  .badge-done { background: #d4edda; color: #155724; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #333; color: #fff; padding: 12px 20px; border-radius: 7px; font-size: 13px; z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .toast.success { background: #2ea44f; }
+  .toast.error { background: #e74c3c; }
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; }
+  .modal h3 { font-size: 16px; margin-bottom: 16px; }
+  .modal .field { margin-bottom: 14px; }
+  .modal .field label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 5px; text-transform: uppercase; }
+  .modal .field input, .modal .field textarea { width: 100%; border: 1px solid #d1d8dd; border-radius: 5px; padding: 8px 10px; font-size: 13px; outline: none; }
+  .modal .field input:focus, .modal .field textarea:focus { border-color: #5e64ff; }
+  .modal .field textarea { min-height: 60px; resize: vertical; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .loading { text-align: center; padding: 40px; color: #aaa; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>SaparERP — Translation Tool</h1>
+  <a href="/desk">← Back to Desk</a>
+</div>
+
+<div class="toolbar">
+  <label>Language</label>
+  <select id="langSel">
+    <option value="uz">O'zbekcha (uz)</option>
+    <option value="ru">Русский (ru)</option>
+    <option value="en">English overrides (en)</option>
+  </select>
+
+  <label>Filter</label>
+  <select id="filterSel">
+    <option value="all">All strings</option>
+    <option value="empty">Untranslated only</option>
+    <option value="done">Translated only</option>
+  </select>
+
+  <input type="text" id="searchInp" placeholder="Search source or translation…" style="min-width:220px">
+
+  <button class="btn btn-default" onclick="openNewModal()">+ Add New</button>
+  <button class="btn btn-success" id="saveBtn" onclick="saveAll()" disabled>Save Changes</button>
+
+  <div class="stats" id="statsEl">—</div>
+</div>
+
+<main>
+  <div class="card">
+    <div id="tableWrap"><div class="loading">Loading translations…</div></div>
+    <div class="pager" id="pagerEl" style="display:none"></div>
+  </div>
+</main>
+
+<!-- Add New Modal -->
+<div class="modal-overlay" id="newModal">
+  <div class="modal">
+    <h3>Add Translation</h3>
+    <div class="field">
+      <label>Source Text (English)</label>
+      <textarea id="newSrc" placeholder="Enter the English string exactly as it appears in the UI"></textarea>
+    </div>
+    <div class="field">
+      <label>Translation (<span id="newLangLabel">uz</span>)</label>
+      <textarea id="newTrans" placeholder="Enter the translation"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-default" onclick="closeNewModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addNew()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API = '/api/method';
+var state = { lang: 'uz', rows: [], dirty: {}, page: 1, pageSize: 50 };
+var filtered = [];
+
+// ─── API helpers ────────────────────────────────────────────────────────────
+
+function getCsrf() {
+  var m = document.cookie.match(/csrf_token=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+function api(method, args) {
+  return fetch(API + '/' + method, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': getCsrf() },
+    body: JSON.stringify(args)
+  }).then(r => r.json()).then(d => {
+    if (d.exc) throw new Error(d.exc);
+    return d.message;
+  });
+}
+
+// ─── Load ────────────────────────────────────────────────────────────────────
+
+function load() {
+  document.getElementById('tableWrap').innerHTML = '<div class="loading">Loading translations…</div>';
+  document.getElementById('pagerEl').style.display = 'none';
+  api('frappe.client.get_list', {
+    doctype: 'Translation',
+    filters: [['language', '=', state.lang]],
+    fields: ['name', 'source_text', 'translated_text', 'context'],
+    limit_page_length: 9999,
+    order_by: 'source_text asc'
+  }).then(rows => {
+    state.rows = rows || [];
+    state.dirty = {};
+    state.page = 1;
+    applyFilter();
+    document.getElementById('saveBtn').disabled = true;
+  }).catch(e => {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">Error loading: ' + e.message + '<br>Are you logged into the desk?</div>';
+  });
+}
+
+// ─── Filter + Render ─────────────────────────────────────────────────────────
+
+function applyFilter() {
+  var q = document.getElementById('searchInp').value.toLowerCase();
+  var f = document.getElementById('filterSel').value;
+  filtered = state.rows.filter(r => {
+    var matchQ = !q || r.source_text.toLowerCase().includes(q) || (r.translated_text || '').toLowerCase().includes(q);
+    var matchF = f === 'all' ? true : f === 'empty' ? !r.translated_text : !!r.translated_text;
+    return matchQ && matchF;
+  });
+  state.page = 1;
+  renderTable();
+  renderStats();
+}
+
+function renderStats() {
+  var done = state.rows.filter(r => r.translated_text).length;
+  var dirtyCount = Object.keys(state.dirty).length;
+  document.getElementById('statsEl').innerHTML =
+    'Showing <span>' + filtered.length + '</span> / <span>' + state.rows.length + '</span> strings' +
+    (dirtyCount ? ' &bull; <span style="color:#e67e22">' + dirtyCount + ' unsaved</span>' : '');
+}
+
+function renderTable() {
+  var start = (state.page - 1) * state.pageSize;
+  var pageRows = filtered.slice(start, start + state.pageSize);
+
+  if (!filtered.length) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">No strings found.</div>';
+    document.getElementById('pagerEl').style.display = 'none';
+    return;
+  }
+
+  var html = '<table><thead><tr><th style="width:42%">Source Text (English)</th><th>Translation</th><th>Actions</th></tr></thead><tbody>';
+  pageRows.forEach(r => {
+    var isDirty = !!state.dirty[r.name];
+    var val = (isDirty ? state.dirty[r.name] : r.translated_text) || '';
+    var badge = val ? '<span class="badge badge-done">✓</span>' : '<span class="badge badge-empty">empty</span>';
+    html += '<tr class="' + (isDirty ? 'dirty' : '') + '" data-name="' + esc(r.name) + '">' +
+      '<td class="src">' + esc(r.source_text) + (r.context ? '<span class="lang-note">context: ' + esc(r.context) + '</span>' : '') + '</td>' +
+      '<td><input class="trans-input" type="text" data-name="' + esc(r.name) + '" value="' + esc(val) + '" placeholder="Enter translation…"></td>' +
+      '<td class="actions">' + badge + ' <button class="del-btn" data-name="' + esc(r.name) + '" title="Delete">✕</button></td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('tableWrap').innerHTML = html;
+
+  // Events
+  document.querySelectorAll('.trans-input').forEach(inp => {
+    inp.addEventListener('input', function() {
+      var name = this.dataset.name;
+      var orig = state.rows.find(r => r.name === name);
+      if (orig && this.value !== (orig.translated_text || '')) {
+        state.dirty[name] = this.value;
+        this.closest('tr').classList.add('dirty');
+      } else {
+        delete state.dirty[name];
+        this.closest('tr').classList.remove('dirty');
+      }
+      document.getElementById('saveBtn').disabled = Object.keys(state.dirty).length === 0;
+      renderStats();
+    });
+  });
+
+  document.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      var name = this.dataset.name;
+      if (!confirm('Delete this translation?')) return;
+      api('frappe.client.delete', { doctype: 'Translation', name: name })
+        .then(() => {
+          state.rows = state.rows.filter(r => r.name !== name);
+          delete state.dirty[name];
+          applyFilter();
+          toast('Deleted', 'success');
+        }).catch(e => toast('Error: ' + e.message, 'error'));
+    });
+  });
+
+  renderPager();
+}
+
+function renderPager() {
+  var total = filtered.length;
+  var pages = Math.ceil(total / state.pageSize);
+  var pager = document.getElementById('pagerEl');
+  if (pages <= 1) { pager.style.display = 'none'; return; }
+  pager.style.display = 'flex';
+  var html = '';
+  html += '<button onclick="gotoPage(' + Math.max(1, state.page-1) + ')" ' + (state.page===1?'disabled':'') + '>‹</button>';
+  for (var p = Math.max(1, state.page-3); p <= Math.min(pages, state.page+3); p++) {
+    html += '<button class="' + (p===state.page?'active':'') + '" onclick="gotoPage(' + p + ')">' + p + '</button>';
+  }
+  html += '<button onclick="gotoPage(' + Math.min(pages, state.page+1) + ')" ' + (state.page===pages?'disabled':'') + '>›</button>';
+  html += '<span class="info">Page ' + state.page + ' of ' + pages + ' (' + total + ' rows)</span>';
+  pager.innerHTML = html;
+}
+
+function gotoPage(p) { state.page = p; renderTable(); window.scrollTo(0, 0); }
+
+// ─── Save ────────────────────────────────────────────────────────────────────
+
+function saveAll() {
+  var names = Object.keys(state.dirty);
+  if (!names.length) return;
+  var btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  var done = 0, errors = 0;
+  names.forEach(name => {
+    api('frappe.client.set_value', { doctype: 'Translation', name: name, fieldname: 'translated_text', value: state.dirty[name] })
+      .then(() => {
+        var r = state.rows.find(r => r.name === name);
+        if (r) r.translated_text = state.dirty[name];
+        delete state.dirty[name];
+        done++;
+        check();
+      }).catch(() => { errors++; done++; check(); });
+  });
+  function check() {
+    if (done < names.length) return;
+    btn.textContent = 'Save Changes';
+    btn.disabled = Object.keys(state.dirty).length === 0;
+    applyFilter();
+    toast(done - errors + ' saved' + (errors ? ', ' + errors + ' errors' : ''), errors ? 'error' : 'success');
+  }
+}
+
+// ─── Add New ─────────────────────────────────────────────────────────────────
+
+function openNewModal() {
+  document.getElementById('newLangLabel').textContent = state.lang;
+  document.getElementById('newSrc').value = '';
+  document.getElementById('newTrans').value = '';
+  document.getElementById('newModal').classList.add('open');
+  document.getElementById('newSrc').focus();
+}
+function closeNewModal() { document.getElementById('newModal').classList.remove('open'); }
+
+function addNew() {
+  var src = document.getElementById('newSrc').value.trim();
+  var trans = document.getElementById('newTrans').value.trim();
+  if (!src || !trans) { toast('Fill in both fields', 'error'); return; }
+  api('frappe.client.insert', { doc: { doctype: 'Translation', language: state.lang, source_text: src, translated_text: trans } })
+    .then(row => {
+      state.rows.push(row);
+      closeNewModal();
+      applyFilter();
+      toast('Translation added', 'success');
+    }).catch(e => toast('Error: ' + e.message, 'error'));
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function toast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+document.getElementById('langSel').addEventListener('change', function() {
+  if (Object.keys(state.dirty).length && !confirm('You have unsaved changes. Switch language anyway?')) {
+    this.value = state.lang; return;
+  }
+  state.lang = this.value; load();
+});
+document.getElementById('filterSel').addEventListener('change', applyFilter);
+document.getElementById('searchInp').addEventListener('input', applyFilter);
+
+// Close modal on overlay click
+document.getElementById('newModal').addEventListener('click', function(e) {
+  if (e.target === this) closeNewModal();
+});
+
+// Enter key in modal
+document.getElementById('newModal').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.ctrlKey) addNew();
+  if (e.key === 'Escape') closeNewModal();
+});
+
+// Initial load
+load();
+</script>
+</body>
+</html>

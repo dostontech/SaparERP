@@ -1,0 +1,33 @@
+# Wraps erpnext-uz:latest and fixes CRLF line endings on shell scripts
+# (Windows git checks out .sh files with \r\n which Linux refuses to exec)
+FROM erpnext-uz:latest
+USER root
+RUN sed -i 's/\r//' \
+      /usr/local/bin/entrypoint.sh \
+      /usr/local/bin/start.sh \
+      /usr/local/bin/nginx-entrypoint.sh
+# Rename ERPNext → SaparERP and Frappe HR → Sapar HR in app metadata
+RUN sed -i 's/^app_title = "ERPNext"/app_title = "SaparERP"/' \
+      /home/frappe/frappe-bench/apps/erpnext/erpnext/hooks.py && \
+    sed -i 's/app_title = "Frappe HR"/app_title = "Sapar HR"/' \
+      /home/frappe/frappe-bench/apps/hrms/hrms/hooks.py && \
+    sed -i 's/"title": "Frappe HR"/"title": "Sapar HR"/' \
+      /home/frappe/frappe-bench/apps/hrms/hrms/hooks.py
+# Sapar language switcher — bake JS into app public dir and register in hooks
+COPY sapar_lang_switch.js /home/frappe/frappe-bench/apps/frappe/frappe/public/js/sapar_lang_switch.js
+RUN sed -i 's|"telemetry.bundle.js",|"telemetry.bundle.js",\n\t"/assets/frappe/js/sapar_lang_switch.js",|' \
+      /home/frappe/frappe-bench/apps/frappe/frappe/hooks.py && \
+    rm -f /home/frappe/frappe-bench/apps/frappe/frappe/__pycache__/hooks.cpython-314.pyc && \
+    rm -f /home/frappe/frappe-bench/apps/hrms/hrms/__pycache__/hooks.cpython-314.pyc && \
+    rm -f /home/frappe/frappe-bench/apps/erpnext/erpnext/__pycache__/hooks.cpython-314.pyc
+# Sapar Translation Tool — desk page (Core module → frappe/core/page/)
+RUN mkdir -p /home/frappe/frappe-bench/apps/frappe/frappe/core/page/sapar_translate
+COPY sapar_translate_page.py /home/frappe/frappe-bench/apps/frappe/frappe/core/page/sapar_translate/sapar_translate.py
+COPY sapar_translate_page.js /home/frappe/frappe-bench/apps/frappe/frappe/core/page/sapar_translate/sapar_translate.js
+# Sapar Translation HTML page (static, served at /assets/frappe/html/)
+RUN mkdir -p /home/frappe/frappe-bench/apps/frappe/frappe/public/html
+COPY sapar_translate.html /home/frappe/frappe-bench/apps/frappe/frappe/public/html/sapar-translate.html
+# Setup scripts baked in so Railway doesn't need volume mounts
+COPY setup_uz.py /home/frappe/setup_uz.py
+COPY setup_uz_lang.py /home/frappe/setup_uz_lang.py
+USER frappe

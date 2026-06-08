@@ -1,0 +1,176 @@
+# Railway deployment compose
+# Uses pre-built image from Docker Hub (set SAPAR_IMAGE env var in Railway)
+# All sensitive values come from Railway environment variables
+
+x-image: &image
+  image: ${SAPAR_IMAGE:-frappe/erpnext:v16.0.0}
+
+x-depends-on-setup: &depends_on_setup
+  depends_on:
+    create-and-setup:
+      condition: service_completed_successfully
+
+x-volumes: &app-volumes
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - logs:/home/frappe/frappe-bench/logs
+
+services:
+
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --max_allowed_packet=512M
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-sapar2024}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-sapar2024}
+      MARIADB_AUTO_UPGRADE: 1
+    volumes:
+      - db-data:/var/lib/mysql
+
+  redis-cache:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+
+  redis-queue:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-queue-data:/data
+
+  configurator:
+    <<: *image
+    restart: "no"
+    entrypoint: [bash, -c]
+    command:
+      - >
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host $$DB_HOST;
+        bench set-config -gp db_port $$DB_PORT;
+        bench set-config -g redis_cache "redis://$$REDIS_CACHE";
+        bench set-config -g redis_queue "redis://$$REDIS_QUEUE";
+        bench set-config -g redis_socketio "redis://$$REDIS_QUEUE";
+        bench set-config -gp socketio_port $$SOCKETIO_PORT;
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      REDIS_CACHE: redis-cache:6379
+      REDIS_QUEUE: redis-queue:6379
+      SOCKETIO_PORT: "9000"
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+
+  create-and-setup:
+    <<: *image
+    restart: "no"
+    <<: *app-volumes
+    entrypoint: [bash, -c]
+    command:
+      - >
+        wait-for-it -t 120 db:3306;
+        wait-for-it -t 120 redis-cache:6379;
+        wait-for-it -t 120 redis-queue:6379;
+        export start=`date +%s`;
+        until [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".db_host // empty"` ]]; do
+          echo "Waiting for configurator..."; sleep 5;
+          if (( `date +%s`-start > 180 )); then echo "Timeout waiting for configurator"; exit 1; fi;
+        done;
+        if [ -f sites/frontend/site_config.json ]; then
+          echo "Site already exists — skipping creation";
+        else
+          echo "Creating site...";
+          bench new-site --mariadb-user-host-login-scope='%'
+            --admin-password=${ADMIN_PASSWORD:-admin}
+            --db-root-username=root
+            --db-root-password=${DB_ROOT_PASSWORD:-sapar2024}
+            --install-app erpnext
+            --install-app hrms
+            --set-default frontend;
+          echo "Running Uzbek setup...";
+          /home/frappe/frappe-bench/env/bin/python /home/frappe/setup_uz.py;
+          /home/frappe/frappe-bench/env/bin/python /home/frappe/setup_uz_lang.py;
+          mkdir -p sites/assets/frappe/js;
+          cp apps/frappe/frappe/public/js/sapar_lang_switch.js sites/assets/frappe/js/sapar_lang_switch.js || true;
+          mkdir -p sites/assets/frappe/html;
+          cp apps/frappe/frappe/public/html/sapar-translate.html sites/assets/frappe/html/ || true;
+        fi;
+        echo "Setup complete.";
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  backend:
+    <<: [*image, *depends_on_setup]
+    restart: unless-stopped
+    <<: *app-volumes
+    environment:
+      GUNICORN_WORKERS: "2"
+      GUNICORN_THREADS: "4"
+      GUNICORN_TIMEOUT: "120"
+
+  websocket:
+    <<: [*image, *depends_on_setup]
+    restart: unless-stopped
+    command: [node, /home/frappe/frappe-bench/apps/frappe/socketio.js]
+    <<: *app-volumes
+
+  frontend:
+    <<: [*image, *depends_on_setup]
+    restart: unless-stopped
+    command: [nginx-entrypoint.sh]
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: frontend
+      UPSTREAM_REAL_IP_ADDRESS: "127.0.0.1"
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: "120"
+      CLIENT_MAX_BODY_SIZE: 50m
+    ports:
+      - "8080:8080"
+    <<: *app-volumes
+    depends_on:
+      - backend
+      - websocket
+
+  queue-short:
+    <<: [*image, *depends_on_setup]
+    restart: unless-stopped
+    command: [bench, worker, --queue, "short,default"]
+    <<: *app-volumes
+
+  queue-long:
+    <<: [*image, *depends_on_setup]
+    restart: unless-stopped
+    command: [bench, worker, --queue, "long,default,short"]
+    <<: *app-volumes
+
+  scheduler:
+    <<: [*image, *depends_on_setup]
+    restart: unless-stopped
+    command: [bench, schedule]
+    <<: *app-volumes
+
+volumes:
+  db-data:
+  redis-queue-data:
+  sites:
+  logs:
