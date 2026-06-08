@@ -1,0 +1,67 @@
+name: Build & Push SaparERP to Docker Hub
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps-uz.json"
+      - "Dockerfile.uz"
+      - "sapar_lang_switch.js"
+      - "sapar_translate.html"
+      - "sapar_translate_page.*"
+      - "setup_uz*.py"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Encode apps-uz.json to base64
+        id: b64
+        run: echo "value=$(base64 -w 0 apps-uz.json)" >> $GITHUB_OUTPUT
+
+      # Step 1: Build base image with frappe + erpnext + hrms (~40 min first time, cached after)
+      - name: Build base image erpnext-uz
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: images/layered/Dockerfile
+          build-args: |
+            FRAPPE_PATH=https://github.com/frappe/frappe
+            FRAPPE_BRANCH=version-16
+            APPS_JSON_BASE64=${{ steps.b64.outputs.value }}
+          load: true
+          tags: erpnext-uz:latest
+          cache-from: type=gha,scope=erpnext-uz
+          cache-to: type=gha,scope=erpnext-uz,mode=max
+
+      # Step 2: Apply SaparERP customizations on top
+      - name: Build SaparERP image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.uz
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/saparerp:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/saparerp:v16
+          cache-from: type=gha,scope=saparerp
+          cache-to: type=gha,scope=saparerp,mode=max
+
+      - name: Print image name
+        run: echo "Pushed ${{ secrets.DOCKERHUB_USERNAME }}/saparerp:latest to Docker Hub"
