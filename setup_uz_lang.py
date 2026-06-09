@@ -533,6 +533,7 @@ def main():
         setup_languages()
         import_translations()
         import_russian_translations()
+        fix_branding_all_langs()
         rename_workspaces()
         fix_desktop_icons()
         setup_translation_page()
@@ -690,6 +691,42 @@ def import_translations():
             """, (source, target))
             en_ins += 1
     print(f"  OK  {en_ins} English overrides applied")
+
+
+def fix_branding_all_langs():
+    print("\n── Brand Override (all languages) ───────")
+    pairs = [
+        ("Frappe HR", "Sapar HR"),
+        ("ERPNext", "SaparERP"),
+        ("Frappe Framework", "SaparERP Framework"),
+    ]
+    for old, new in pairs:
+        # 1. Replace anywhere old brand appears as a translated_text value
+        frappe.db.sql(
+            "UPDATE `tabTranslation` SET translated_text=REPLACE(translated_text,%s,%s), "
+            "modified=NOW() WHERE translated_text LIKE %s",
+            (old, new, f"%{old}%")
+        )
+        # 2. Ensure explicit override exists for each language
+        for lang in ["en", "uz", "ru"]:
+            exists = frappe.db.sql(
+                "SELECT name FROM `tabTranslation` WHERE language=%s AND source_text=%s",
+                (lang, old), as_list=True
+            )
+            if exists:
+                frappe.db.sql(
+                    "UPDATE `tabTranslation` SET translated_text=%s, modified=NOW() "
+                    "WHERE language=%s AND source_text=%s",
+                    (new, lang, old)
+                )
+            else:
+                frappe.db.sql("""
+                    INSERT INTO `tabTranslation`
+                      (name,creation,modified,modified_by,owner,docstatus,idx,
+                       language,source_text,translated_text)
+                    VALUES (UUID(),NOW(),NOW(),'Administrator','Administrator',0,0,%s,%s,%s)
+                """, (lang, old, new))
+        print(f"  OK  '{old}' → '{new}' patched for en/uz/ru")
 
 
 def fix_desktop_icons():
