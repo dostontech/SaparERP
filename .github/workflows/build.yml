@@ -52,8 +52,8 @@ jobs:
             apps_json=apps-uz.json
           outputs: type=docker,dest=/tmp/erpnext-uz.tar
           tags: erpnext-uz:latest
-          cache-from: type=gha,scope=erpnext-uz
-          cache-to: type=gha,scope=erpnext-uz,mode=max
+          cache-from: type=gha,scope=erpnext-uz-v2
+          cache-to: type=gha,scope=erpnext-uz-v2,mode=max
 
       - name: Load base image into local daemon
         run: docker load --input /tmp/erpnext-uz.tar
