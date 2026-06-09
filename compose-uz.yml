@@ -134,6 +134,9 @@ services:
         echo "==> Deploying language switcher JS to sites volume...";
         mkdir -p sites/assets/frappe/js &&
         cp apps/frappe/frappe/public/js/sapar_lang_switch.js sites/assets/frappe/js/sapar_lang_switch.js;
+        echo "==> Deploying translation tool to sites volume...";
+        mkdir -p sites/assets/sapar/html &&
+        cp apps/frappe/frappe/public/html/sapar-translate.html sites/assets/sapar/html/sapar-translate.html || true;
         echo "==> Setup complete.";
     depends_on:
       configurator:
