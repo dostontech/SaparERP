@@ -38,11 +38,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Encode apps-uz.json
-        id: b64
-        run: echo "value=$(base64 -w 0 apps-uz.json)" >> $GITHUB_OUTPUT
-
       # Step 1 — Build base image: frappe + erpnext + hrms (~40 min, cached after)
+      # apps-uz.json is passed as a BuildKit secret (matches --mount=type=secret,id=apps_json in Containerfile)
       - name: Build base image erpnext-uz
         uses: docker/build-push-action@v6
         with:
@@ -51,7 +48,8 @@ jobs:
           build-args: |
             FRAPPE_PATH=https://github.com/frappe/frappe
             FRAPPE_BRANCH=version-16
-            APPS_JSON_BASE64=${{ steps.b64.outputs.value }}
+          secret-files: |
+            apps_json=apps-uz.json
           outputs: type=docker,dest=/tmp/erpnext-uz.tar
           tags: erpnext-uz:latest
           cache-from: type=gha,scope=erpnext-uz
