@@ -57,22 +57,21 @@ jobs:
           cache-from: type=gha,scope=erpnext-uz
           cache-to: type=gha,scope=erpnext-uz,mode=max
 
-      - name: Load base image
+      - name: Load base image into local daemon
         run: docker load --input /tmp/erpnext-uz.tar
 
       # Step 2 — Apply SaparERP branding + UZ customizations
+      # --builder default uses the docker driver (not docker-container) so it
+      # can see the locally loaded base image from the step above
       - name: Build & push SaparERP image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.uz
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:v16
-          cache-from: type=gha,scope=saparerp
-          cache-to: type=gha,scope=saparerp,mode=max
-          load: false
+        run: |
+          docker buildx build \
+            --builder default \
+            --file Dockerfile.uz \
+            --push \
+            --tag ${{ env.IMAGE }}:latest \
+            --tag ${{ env.IMAGE }}:v16 \
+            .
 
       - name: Summary
         run: |
