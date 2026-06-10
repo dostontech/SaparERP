@@ -135,42 +135,72 @@ var filtered = [];
 
 // ─── API helpers ────────────────────────────────────────────────────────────
 
+var _csrf = '';
 function getCsrf() {
+  if (_csrf) return _csrf;
   var m = document.cookie.match(/csrf_token=([^;]+)/);
-  return m ? decodeURIComponent(m[1]) : '';
+  _csrf = m ? decodeURIComponent(m[1]) : '';
+  return _csrf;
 }
 
+// X-Frappe-CSRF-Token: fetch is a Frappe built-in — skips CSRF check and
+// returns the real token in the response so we can cache it for future calls.
 function api(method, args) {
+  var csrf = getCsrf() || 'fetch';
   return fetch(API + '/' + method, {
     method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': getCsrf() },
+    credentials: 'include',
+    headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': csrf},
     body: JSON.stringify(args)
   }).then(r => r.json()).then(d => {
+    if (d.csrf_token) { _csrf = d.csrf_token; } // cache fresh token from response
+    if (d.exc_type === 'CSRFTokenError') {
+      // Reset cache and retry once with 'fetch' header
+      _csrf = '';
+      return fetch(API + '/' + method, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': 'fetch'},
+        body: JSON.stringify(args)
+      }).then(r => r.json()).then(d2 => {
+        if (d2.csrf_token) _csrf = d2.csrf_token;
+        if (d2.exc) throw new Error(d2.exc);
+        return d2.message;
+      });
+    }
     if (d.exc) throw new Error(d.exc);
     return d.message;
   });
 }
 
-// ─── Load ────────────────────────────────────────────────────────────────────
+// ─── Load (REST GET — no CSRF needed) ────────────────────────────────────────
 
 function load() {
   document.getElementById('tableWrap').innerHTML = '<div class="loading">Loading translations…</div>';
   document.getElementById('pagerEl').style.display = 'none';
-  api('frappe.client.get_list', {
-    doctype: 'Translation',
-    filters: [['language', '=', state.lang]],
-    fields: ['name', 'source_text', 'translated_text', 'context'],
-    limit_page_length: 9999,
-    order_by: 'source_text asc'
-  }).then(rows => {
-    state.rows = rows || [];
+  var url = '/api/resource/Translation'
+    + '?filters=' + encodeURIComponent(JSON.stringify([['language','=',state.lang]]))
+    + '&fields=' + encodeURIComponent(JSON.stringify(['name','source_text','translated_text','context']))
+    + '&limit_page_length=2000&order_by=source_text%20asc';
+  fetch(url, {credentials: 'include'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.exc_type === 'AuthenticationError' || (d.message && d.message === 'Guest')) {
+        document.getElementById('tableWrap').innerHTML =
+          '<div class="empty" style="font-size:15px">Session expired.<br><br>' +
+          '<a href="/login?redirect-to=' + encodeURIComponent(window.location.pathname) +
+          '" style="background:#5e64ff;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">Login again</a></div>';
+        return;
+      }
+      var rows = (d.data || d.message || []);
+    state.rows = rows;
     state.dirty = {};
     state.page = 1;
     applyFilter();
     document.getElementById('saveBtn').disabled = true;
-  }).catch(e => {
-    document.getElementById('tableWrap').innerHTML = '<div class="empty">Error loading: ' + e.message + '<br>Are you logged into the desk?</div>';
+  })
+  .catch(e => {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">Error: ' + e.message + '<br><a href="/login">Login again</a></div>';
   });
 }
 
@@ -359,8 +389,25 @@ document.getElementById('newModal').addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeNewModal();
 });
 
-// Initial load
-load();
+function getCsrf() {
+  var m = document.cookie.match(/csrf_token=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+// Warm session + CSRF cookie via GET, then start the app
+fetch('/api/method/frappe.auth.get_logged_user', {credentials: 'include'})
+  .then(r => r.json())
+  .then(d => {
+    if (!d.message || d.message === 'Guest') {
+      document.getElementById('tableWrap').innerHTML =
+        '<div class="empty" style="font-size:15px">You are not logged in.<br><br>' +
+        '<a href="/login?redirect-to=' + encodeURIComponent(window.location.pathname) +
+        '" style="background:#5e64ff;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">Login to Frappe</a></div>';
+    } else {
+      load();
+    }
+  })
+  .catch(() => load());
 </script>
 </body>
 </html>

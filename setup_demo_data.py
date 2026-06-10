@@ -711,6 +711,13 @@ def setup_company(cfg, label):
     print(f"\n  ✓  {cfg['company_name']} setup complete!\n")
 
 
+def ensure_warehouse_types():
+    for wt in ["Stores", "Transit", "Manufacturing", "Fixed Asset"]:
+        if not frappe.db.exists("Warehouse Type", wt):
+            frappe.get_doc({"doctype": "Warehouse Type", "name": wt}).insert(ignore_permissions=True)
+    frappe.db.commit()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--company", choices=["small", "large", "both"], default="both")
@@ -721,6 +728,7 @@ def main():
     frappe.set_user("Administrator")
 
     try:
+        ensure_warehouse_types()
         if args.company in ("small", "both"):
             setup_company(SMALL, "Small Company")
         if args.company in ("large", "both"):
