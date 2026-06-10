@@ -775,6 +775,26 @@ def ensure_prerequisites():
                 doc["parent_customer_group"] = parent
             frappe.get_doc(doc).insert(ignore_permissions=True)
 
+    # Gender
+    for g in ["Male", "Female", "Other"]:
+        if not frappe.db.exists("Gender", g):
+            frappe.get_doc({"doctype": "Gender", "gender": g}).insert(ignore_permissions=True)
+
+    # Employment Type
+    for et in ["Regular", "Contract", "Part-time", "Intern"]:
+        if not frappe.db.exists("Employment Type", et):
+            frappe.get_doc({"doctype": "Employment Type", "employment_type_name": et}).insert(ignore_permissions=True)
+
+    # Leave Types (required by HRMS employee workflow)
+    for lt in ["Annual Leave", "Sick Leave", "Casual Leave", "Maternity Leave"]:
+        if not frappe.db.exists("Leave Type", lt):
+            frappe.get_doc({
+                "doctype": "Leave Type",
+                "leave_type_name": lt,
+                "max_leaves_allowed": 12,
+                "allow_negative": 0,
+            }).insert(ignore_permissions=True)
+
     frappe.db.commit()
 
 
