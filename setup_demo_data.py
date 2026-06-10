@@ -837,6 +837,19 @@ def ensure_prerequisites():
                 "allow_negative": 0,
             }).insert(ignore_permissions=True)
 
+    # Fiscal Years — needed to post transactions
+    import datetime as _dt
+    current_year = _dt.date.today().year
+    for yr in [current_year - 1, current_year, current_year + 1]:
+        yr_str = str(yr)
+        if not frappe.db.exists("Fiscal Year", yr_str):
+            frappe.get_doc({
+                "doctype": "Fiscal Year",
+                "year": yr_str,
+                "year_start_date": f"{yr}-01-01",
+                "year_end_date": f"{yr}-12-31",
+            }).insert(ignore_permissions=True)
+
     frappe.db.commit()
 
 
