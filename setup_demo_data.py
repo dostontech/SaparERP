@@ -783,7 +783,7 @@ def ensure_prerequisites():
     # Employment Type
     for et in ["Regular", "Contract", "Part-time", "Intern"]:
         if not frappe.db.exists("Employment Type", et):
-            frappe.get_doc({"doctype": "Employment Type", "employment_type": et}).insert(ignore_permissions=True)
+            frappe.get_doc({"doctype": "Employment Type", "name": et, "employment_type": et}).insert(ignore_permissions=True)
 
     # Leave Types (required by HRMS employee workflow)
     for lt in ["Annual Leave", "Sick Leave", "Casual Leave", "Maternity Leave"]:
