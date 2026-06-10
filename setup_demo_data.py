@@ -321,6 +321,16 @@ def setup_item_groups(cfg):
 
 
 def setup_departments(cfg, company):
+    root = f"All Departments - {cfg['abbr']}"
+    if not frappe.db.exists("Department", root):
+        frappe.get_doc({
+            "doctype": "Department",
+            "department_name": "All Departments",
+            "company": company,
+            "is_group": 1,
+        }).insert(ignore_permissions=True)
+        frappe.db.commit()
+
     depts = set(e["dept"] for e in cfg["employees"])
     for d in depts:
         if not exists("Department", f"{d} - {cfg['abbr']}"):
@@ -328,7 +338,7 @@ def setup_departments(cfg, company):
                 "doctype": "Department",
                 "department_name": d,
                 "company": company,
-                "parent_department": f"All Departments - {cfg['abbr']}",
+                "parent_department": root,
             }).insert(ignore_permissions=True)
     frappe.db.commit()
     print(f"  OK  Departments: {', '.join(depts)}")
