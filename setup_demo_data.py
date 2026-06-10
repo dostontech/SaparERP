@@ -564,40 +564,61 @@ def create_salary_structures(cfg, emp_map):
 #  TRANSACTIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
+def get_default_accounts(company, abbr):
+    """Return default GL accounts and cost center for invoice creation."""
+    def acc(candidates):
+        for name in candidates:
+            full = f"{name} - {abbr}"
+            if frappe.db.exists("Account", full):
+                return full
+        return None
+
+    cost_center = (
+        frappe.db.get_value("Cost Center", {"company": company, "cost_center_name": "Main"})
+        or frappe.db.get_value("Cost Center", {"company": company, "is_group": 0})
+    )
+    return {
+        "receivable":    acc(["Debtors", "Accounts Receivable"]),
+        "payable":       acc(["Creditors", "Accounts Payable"]),
+        "income":        acc(["Sales", "Sales Income", "Revenue"]),
+        "expense":       acc(["Cost of Goods Sold", "Stock Expenses", "Purchases"]),
+        "cost_center":   cost_center,
+    }
+
+
 def create_purchase_invoices(cfg, count=10):
     company = cfg["company_name"]
     abbr = cfg["abbr"]
     wh = cfg["warehouses"][0]
     items = cfg["items"]
     suppliers = [s[0] for s in cfg["suppliers"]]
-    created = 0
+    accs = get_default_accounts(company, abbr)
+    created = skipped = 0
 
     for i in range(count):
         supplier = random.choice(suppliers)
         if not exists("Supplier", supplier):
             continue
         posting_date = rand_date_range(5, 1)
-        n_items = random.randint(2, 5)
-        sel_items = random.sample(items, min(n_items, len(items)))
+        sel_items = random.sample(items, min(random.randint(2, 5), len(items)))
 
         inv_items = []
         for iname, grp, rate, uom in sel_items:
             if not exists("Item", iname):
                 continue
-            qty = random.randint(5, 50)
-            inv_items.append({
-                "item_code": iname,
-                "qty": qty,
-                "rate": rate * 0.65,
-                "uom": uom,
-                "warehouse": wh,
-            })
+            row = {"item_code": iname, "qty": random.randint(5, 50),
+                   "rate": rate * 0.65, "uom": uom, "warehouse": wh}
+            if accs["expense"]:
+                row["expense_account"] = accs["expense"]
+            if accs["cost_center"]:
+                row["cost_center"] = accs["cost_center"]
+            inv_items.append(row)
 
         if not inv_items:
             continue
 
         try:
-            doc = frappe.get_doc({
+            doc_data = {
                 "doctype": "Purchase Invoice",
                 "company": company,
                 "supplier": supplier,
@@ -608,12 +629,19 @@ def create_purchase_invoices(cfg, count=10):
                 "buying_price_list": "Standard Buying",
                 "update_stock": 1,
                 "items": inv_items,
-            })
+            }
+            if accs["payable"]:
+                doc_data["credit_to"] = accs["payable"]
+            if accs["cost_center"]:
+                doc_data["cost_center"] = accs["cost_center"]
+            doc = frappe.get_doc(doc_data)
             doc.insert(ignore_permissions=True)
             doc.submit()
             created += 1
         except Exception as e:
-            pass  # skip if validation fails
+            skipped += 1
+            if skipped == 1:
+                print(f"  WARN PI: {e}")
 
     frappe.db.commit()
     print(f"  OK  {created}/{count} purchase invoices created & submitted")
@@ -621,37 +649,37 @@ def create_purchase_invoices(cfg, count=10):
 
 def create_sales_invoices(cfg, count=15):
     company = cfg["company_name"]
+    abbr = cfg["abbr"]
     wh = cfg["warehouses"][0]
     items = cfg["items"]
     customers = [c[0] for c in cfg["customers"]]
-    created = 0
+    accs = get_default_accounts(company, abbr)
+    created = skipped = 0
 
     for i in range(count):
         customer = random.choice(customers)
         if not exists("Customer", customer):
             continue
         posting_date = rand_date_range(4, 0)
-        n_items = random.randint(1, 4)
-        sel_items = random.sample(items, min(n_items, len(items)))
+        sel_items = random.sample(items, min(random.randint(1, 4), len(items)))
 
         inv_items = []
         for iname, grp, rate, uom in sel_items:
             if not exists("Item", iname):
                 continue
-            qty = random.randint(1, 10)
-            inv_items.append({
-                "item_code": iname,
-                "qty": qty,
-                "rate": rate,
-                "uom": uom,
-                "warehouse": wh,
-            })
+            row = {"item_code": iname, "qty": random.randint(1, 10),
+                   "rate": rate, "uom": uom, "warehouse": wh}
+            if accs["income"]:
+                row["income_account"] = accs["income"]
+            if accs["cost_center"]:
+                row["cost_center"] = accs["cost_center"]
+            inv_items.append(row)
 
         if not inv_items:
             continue
 
         try:
-            doc = frappe.get_doc({
+            doc_data = {
                 "doctype": "Sales Invoice",
                 "company": company,
                 "customer": customer,
@@ -660,12 +688,19 @@ def create_sales_invoices(cfg, count=15):
                 "selling_price_list": "Standard Selling",
                 "update_stock": 1,
                 "items": inv_items,
-            })
+            }
+            if accs["receivable"]:
+                doc_data["debit_to"] = accs["receivable"]
+            if accs["cost_center"]:
+                doc_data["cost_center"] = accs["cost_center"]
+            doc = frappe.get_doc(doc_data)
             doc.insert(ignore_permissions=True)
             doc.submit()
             created += 1
         except Exception as e:
-            pass
+            skipped += 1
+            if skipped == 1:
+                print(f"  WARN SI: {e}")
 
     frappe.db.commit()
     print(f"  OK  {created}/{count} sales invoices created & submitted")
