@@ -759,6 +759,18 @@ def ensure_prerequisites():
             "is_group": 1,
         }).insert(ignore_permissions=True)
 
+    # Price Lists
+    for pl_name, buying, selling in [("Standard Selling", 0, 1), ("Standard Buying", 1, 0)]:
+        if not frappe.db.exists("Price List", pl_name):
+            frappe.get_doc({
+                "doctype": "Price List",
+                "price_list_name": pl_name,
+                "currency": "UZS",
+                "buying": buying,
+                "selling": selling,
+                "enabled": 1,
+            }).insert(ignore_permissions=True)
+
     frappe.db.commit()
 
 
