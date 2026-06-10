@@ -711,10 +711,44 @@ def setup_company(cfg, label):
     print(f"\n  ✓  {cfg['company_name']} setup complete!\n")
 
 
-def ensure_warehouse_types():
+def ensure_prerequisites():
+    # Warehouse Types
     for wt in ["Stores", "Transit", "Manufacturing", "Fixed Asset"]:
         if not frappe.db.exists("Warehouse Type", wt):
             frappe.get_doc({"doctype": "Warehouse Type", "name": wt}).insert(ignore_permissions=True)
+
+    # Root Territory
+    if not frappe.db.exists("Territory", "All Territories"):
+        frappe.get_doc({
+            "doctype": "Territory",
+            "territory_name": "All Territories",
+            "is_group": 1,
+        }).insert(ignore_permissions=True)
+
+    # Root Customer Group
+    if not frappe.db.exists("Customer Group", "All Customer Groups"):
+        frappe.get_doc({
+            "doctype": "Customer Group",
+            "customer_group_name": "All Customer Groups",
+            "is_group": 1,
+        }).insert(ignore_permissions=True)
+
+    # Root Supplier Group
+    if not frappe.db.exists("Supplier Group", "All Supplier Groups"):
+        frappe.get_doc({
+            "doctype": "Supplier Group",
+            "supplier_group_name": "All Supplier Groups",
+            "is_group": 1,
+        }).insert(ignore_permissions=True)
+
+    # Root Item Group
+    if not frappe.db.exists("Item Group", "All Item Groups"):
+        frappe.get_doc({
+            "doctype": "Item Group",
+            "item_group_name": "All Item Groups",
+            "is_group": 1,
+        }).insert(ignore_permissions=True)
+
     frappe.db.commit()
 
 
@@ -728,7 +762,7 @@ def main():
     frappe.set_user("Administrator")
 
     try:
-        ensure_warehouse_types()
+        ensure_prerequisites()
         if args.company in ("small", "both"):
             setup_company(SMALL, "Small Company")
         if args.company in ("large", "both"):
