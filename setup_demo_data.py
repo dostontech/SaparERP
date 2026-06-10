@@ -544,11 +544,13 @@ def create_salary_structures(cfg, emp_map):
             continue
         if frappe.db.exists("Salary Structure Assignment", {"employee": emp_name, "salary_structure": struct_map[e["salary"]]}):
             continue
+        joining_date = frappe.db.get_value("Employee", emp_name, "date_of_joining")
+        from_date = max(str(add_months(today(), -6)), str(joining_date))
         frappe.get_doc({
             "doctype": "Salary Structure Assignment",
             "employee": emp_name,
             "salary_structure": struct_map[e["salary"]],
-            "from_date": add_months(today(), -6),
+            "from_date": from_date,
             "base": e["salary"],
             "company": company,
         }).insert(ignore_permissions=True)
