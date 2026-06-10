@@ -377,42 +377,34 @@ def setup_warehouses(cfg):
 def create_items(cfg):
     created = 0
     for item_name, group, rate, uom in cfg["items"]:
-        if exists("Item", item_name):
-            continue
-        # Ensure UOM
-        if not exists("UOM", uom):
-            frappe.get_doc({"doctype": "UOM", "uom_name": uom}).insert(ignore_permissions=True)
-        doc = frappe.get_doc({
-            "doctype": "Item",
-            "item_code": item_name,
-            "item_name": item_name,
-            "item_group": group,
-            "stock_uom": uom,
-            "is_stock_item": 1,
-            "standard_rate": rate,
-            "valuation_rate": rate * 0.7,
-        })
-        doc.insert(ignore_permissions=True)
-        # Set item price
-        frappe.get_doc({
-            "doctype": "Item Price",
-            "item_code": item_name,
-            "price_list": "Standard Selling",
-            "currency": "UZS",
-            "price_list_rate": rate,
-            "buying": 0,
-            "selling": 1,
-        }).insert(ignore_permissions=True)
-        frappe.get_doc({
-            "doctype": "Item Price",
-            "item_code": item_name,
-            "price_list": "Standard Buying",
-            "currency": "UZS",
-            "price_list_rate": rate * 0.65,
-            "buying": 1,
-            "selling": 0,
-        }).insert(ignore_permissions=True)
-        created += 1
+        if not exists("Item", item_name):
+            if not exists("UOM", uom):
+                frappe.get_doc({"doctype": "UOM", "uom_name": uom}).insert(ignore_permissions=True)
+            frappe.get_doc({
+                "doctype": "Item",
+                "item_code": item_name,
+                "item_name": item_name,
+                "item_group": group,
+                "stock_uom": uom,
+                "is_stock_item": 1,
+                "standard_rate": rate,
+                "valuation_rate": rate * 0.7,
+            }).insert(ignore_permissions=True)
+            created += 1
+        for pl, buying, selling, mult in [
+            ("Standard Selling", 0, 1, 1.0),
+            ("Standard Buying",  1, 0, 0.65),
+        ]:
+            if not frappe.db.exists("Item Price", {"item_code": item_name, "price_list": pl}):
+                frappe.get_doc({
+                    "doctype": "Item Price",
+                    "item_code": item_name,
+                    "price_list": pl,
+                    "currency": "UZS",
+                    "price_list_rate": rate * mult,
+                    "buying": buying,
+                    "selling": selling,
+                }).insert(ignore_permissions=True)
     frappe.db.commit()
     print(f"  OK  {created} items created")
 
@@ -770,6 +762,18 @@ def ensure_prerequisites():
                 "selling": selling,
                 "enabled": 1,
             }).insert(ignore_permissions=True)
+
+    # Customer Groups
+    for cg, is_group, parent in [
+        ("All Customer Groups", 1, None),
+        ("Commercial", 0, "All Customer Groups"),
+        ("Individual", 0, "All Customer Groups"),
+    ]:
+        if not frappe.db.exists("Customer Group", cg):
+            doc = {"doctype": "Customer Group", "customer_group_name": cg, "is_group": is_group}
+            if parent:
+                doc["parent_customer_group"] = parent
+            frappe.get_doc(doc).insert(ignore_permissions=True)
 
     frappe.db.commit()
 
