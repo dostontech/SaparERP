@@ -780,10 +780,15 @@ def ensure_prerequisites():
         if not frappe.db.exists("Gender", g):
             frappe.get_doc({"doctype": "Gender", "gender": g}).insert(ignore_permissions=True)
 
-    # Employment Type
+    # Employment Type — use raw SQL to bypass autoname quirk in HRMS v16
     for et in ["Regular", "Contract", "Part-time", "Intern"]:
         if not frappe.db.exists("Employment Type", et):
-            frappe.get_doc({"doctype": "Employment Type", "name": et, "employment_type": et}).insert(ignore_permissions=True)
+            frappe.db.sql(
+                "INSERT INTO `tabEmployment Type` "
+                "(name, creation, modified, modified_by, owner, docstatus, idx) "
+                "VALUES (%s, NOW(), NOW(), 'Administrator', 'Administrator', 0, 0)",
+                (et,)
+            )
 
     # Leave Types (required by HRMS employee workflow)
     for lt in ["Annual Leave", "Sick Leave", "Casual Leave", "Maternity Leave"]:
