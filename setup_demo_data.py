@@ -706,30 +706,58 @@ def create_sales_invoices(cfg, count=15):
     print(f"  OK  {created}/{count} sales invoices created & submitted")
 
 
+def create_salary_slips(cfg):
+    company = cfg["company_name"]
+    from frappe.utils import get_first_day, get_last_day
+    created = 0
+    employees = frappe.db.get_all("Employee", filters={"company": company, "status": "Active"}, fields=["name"])
+    for months_back in [3, 2, 1]:
+        period_start = str(get_first_day(add_months(today(), -months_back)))
+        period_end   = str(get_last_day(add_months(today(), -months_back)))
+        for emp in employees:
+            if frappe.db.exists("Salary Slip", {"employee": emp.name, "start_date": period_start, "docstatus": ["!=", 2]}):
+                continue
+            try:
+                slip = frappe.get_doc({
+                    "doctype": "Salary Slip",
+                    "employee": emp.name,
+                    "company": company,
+                    "start_date": period_start,
+                    "end_date": period_end,
+                    "posting_date": period_end,
+                })
+                slip.insert(ignore_permissions=True)
+                slip.submit()
+                created += 1
+            except Exception:
+                pass
+    frappe.db.commit()
+    print(f"  OK  {created} salary slip(s) created & submitted")
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  UI CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 def configure_demo_ui(default_company):
-    """Create focused demo user; admin keeps full access."""
+    """Create focused demo user with minimal modules; admin keeps full access."""
     print("\n── Demo User Setup ───────────────────────────")
 
-    # Restore all workspaces so admin sees everything
+    # Restore all workspaces for admin
     frappe.db.sql("UPDATE `tabWorkspace` SET is_hidden = 0")
 
-    # Modules to block for the demo user
+    # Block everything except: Selling, Buying, Stock, HR, Payroll, Accounts
     BLOCK = [
         "Manufacturing", "Projects", "Assets", "CRM", "Support",
         "Agriculture", "Education", "Healthcare", "Loan Management",
         "Quality Management", "Non Profit", "ERPNext Integrations",
-        "Hospitality", "Retail",
+        "Hospitality", "Retail", "Utilities", "Integrations",
+        "E Commerce", "Communication", "Printing", "Workflows",
+        "Data Import and Export", "Transaction Log", "Activity",
     ]
 
-    ALL_ROLES = [
-        "Accounts User", "Purchase User", "Sales User",
-        "Stock User", "HR User", "Payroll User",
-        "Sales Master Manager", "Purchase Master Manager",
-    ]
+    # Only basic user roles — no manager/admin roles
+    ALL_ROLES = ["Accounts User", "Purchase User", "Sales User", "Stock User", "HR User"]
     ROLES = [r for r in ALL_ROLES if frappe.db.exists("Role", r)]
 
     email = "demo@nursavdo.uz"
@@ -737,6 +765,11 @@ def configure_demo_ui(default_company):
     if frappe.db.exists("User", email):
         user = frappe.get_doc("User", email)
         user.block_modules = [{"module": m} for m in BLOCK]
+        # Sync roles
+        existing = {r.role for r in user.roles}
+        for r in ROLES:
+            if r not in existing:
+                user.append("roles", {"role": r})
         user.save(ignore_permissions=True)
         print(f"  OK  Demo user updated")
     else:
@@ -753,12 +786,9 @@ def configure_demo_ui(default_company):
             "block_modules": [{"module": m} for m in BLOCK],
         })
         user.insert(ignore_permissions=True)
-        print(f"  OK  Demo user created: {email} / demo123")
+        print(f"  OK  Demo user created: {email} / NurSavdo@2026")
 
-    # Set default company for demo user
     frappe.defaults.set_user_default("company", default_company, user=email)
-
-    # Set global default company
     frappe.db.set_value("System Settings", "System Settings", "default_company", default_company)
     print(f"  OK  Default company → {default_company}")
 
@@ -804,6 +834,9 @@ def setup_company(cfg, label):
     print("\n── Transactions ──────────────────────────────")
     create_purchase_invoices(cfg, pi_count)
     create_sales_invoices(cfg, si_count)
+
+    print("\n── Payroll ───────────────────────────────────")
+    create_salary_slips(cfg)
 
     frappe.db.commit()
     print(f"\n  ✓  {cfg['company_name']} setup complete!\n")
