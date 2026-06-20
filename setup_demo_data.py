@@ -725,11 +725,12 @@ def configure_demo_ui(default_company):
         "Hospitality", "Retail",
     ]
 
-    ROLES = [
+    ALL_ROLES = [
         "Accounts User", "Purchase User", "Sales User",
         "Stock User", "HR User", "Payroll User",
         "Sales Master Manager", "Purchase Master Manager",
     ]
+    ROLES = [r for r in ALL_ROLES if frappe.db.exists("Role", r)]
 
     email = "demo@nursavdo.uz"
 
