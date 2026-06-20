@@ -82,4 +82,26 @@
 	});
 
 	frappe.ready(function () { setTimeout(tryInject, 500); });
+
+	// ── Remove unwanted user-menu items ───────────────────────────────────
+	var HIDDEN_MENU_LABELS = ["Frappe Support", "Delete Demo Data"];
+
+	function removeUnwantedMenuItems() {
+		document.querySelectorAll(".dropdown-menu a, .user-info-menu a").forEach(function (a) {
+			var text = (a.textContent || "").trim();
+			var href = a.href || "";
+			if (
+				HIDDEN_MENU_LABELS.indexOf(text) !== -1 ||
+				href.indexOf("discuss.frappe.io") !== -1
+			) {
+				var li = a.closest("li") || a.parentElement;
+				if (li) li.style.display = "none";
+			}
+		});
+	}
+
+	// Re-run whenever the DOM changes (menus open/close)
+	new MutationObserver(removeUnwantedMenuItems)
+		.observe(document.body, { childList: true, subtree: true });
+
 })();
