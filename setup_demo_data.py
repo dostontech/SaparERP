@@ -746,7 +746,7 @@ def configure_demo_ui(default_company):
             "first_name": "Nur Savdo",
             "last_name": "Demo",
             "username": "nursavdo",
-            "new_password": "demo123",
+            "new_password": "NurSavdo@2026",
             "send_welcome_email": 0,
             "user_type": "System User",
             "roles": [{"role": r} for r in ROLES],
