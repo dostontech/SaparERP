@@ -793,6 +793,18 @@ def configure_demo_ui(default_company):
     frappe.db.set_value("System Settings", "System Settings", "default_company", default_company)
     print(f"  OK  Default company → {default_company}")
 
+    # Restrict demo user to only see their company's data
+    if not frappe.db.exists("User Permission", {"user": email, "allow": "Company", "for_value": default_company}):
+        frappe.get_doc({
+            "doctype": "User Permission",
+            "user": email,
+            "allow": "Company",
+            "for_value": default_company,
+            "is_default": 1,
+            "apply_to_all_doctypes": 1,
+        }).insert(ignore_permissions=True)
+        print(f"  OK  User permission set: only {default_company}")
+
     frappe.db.commit()
 
 
