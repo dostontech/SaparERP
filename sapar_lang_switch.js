@@ -91,7 +91,7 @@
 		'li:has(a[href*="discuss.frappe"]){display:none!important;}';
 	(document.head || document.documentElement).appendChild(_style);
 
-	var HIDDEN_LABELS = ["Frappe Support", "Delete Demo Data"];
+	var HIDDEN_LABELS = ["Frappe Support", "About", "Reset Desktop Layout"];
 
 	function removeUnwantedMenuItems() {
 		document.querySelectorAll(".dropdown-menu li, .user-menu li").forEach(function (li) {
