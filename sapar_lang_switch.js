@@ -84,24 +84,46 @@
 	frappe.ready(function () { setTimeout(tryInject, 500); });
 
 	// ── Remove unwanted user-menu items ───────────────────────────────────
-	var HIDDEN_MENU_LABELS = ["Frappe Support", "Delete Demo Data"];
+	// CSS fallback for href-based items (catches even before JS runs)
+	var _style = document.createElement("style");
+	_style.textContent =
+		'a[href*="discuss.frappe"]{display:none!important;}' +
+		'li:has(a[href*="discuss.frappe"]){display:none!important;}';
+	(document.head || document.documentElement).appendChild(_style);
+
+	var HIDDEN_LABELS = ["Frappe Support", "Delete Demo Data"];
 
 	function removeUnwantedMenuItems() {
-		document.querySelectorAll(".dropdown-menu a, .user-info-menu a").forEach(function (a) {
-			var text = (a.textContent || "").trim();
-			var href = a.href || "";
+		document.querySelectorAll(".dropdown-menu li, .user-menu li").forEach(function (li) {
+			var el = li.querySelector("a, button") || li;
+			var text = (el.textContent || "").trim();
+			var href = (el.getAttribute && el.getAttribute("href")) || "";
 			if (
-				HIDDEN_MENU_LABELS.indexOf(text) !== -1 ||
-				href.indexOf("discuss.frappe.io") !== -1
+				HIDDEN_LABELS.indexOf(text) !== -1 ||
+				href.indexOf("discuss.frappe") !== -1
 			) {
-				var li = a.closest("li") || a.parentElement;
-				if (li) li.style.display = "none";
+				li.style.display = "none";
 			}
 		});
 	}
 
-	// Re-run whenever the DOM changes (menus open/close)
-	new MutationObserver(removeUnwantedMenuItems)
-		.observe(document.body, { childList: true, subtree: true });
+	// Hook into Bootstrap dropdown open events
+	$(document).on("show.bs.dropdown shown.bs.dropdown", function () {
+		setTimeout(removeUnwantedMenuItems, 30);
+		setTimeout(removeUnwantedMenuItems, 150);
+	});
+	// Hook into Frappe page/toolbar events
+	$(document).on("toolbar_setup page-change", function () {
+		setTimeout(removeUnwantedMenuItems, 300);
+	});
+	// MutationObserver as safety net
+	new MutationObserver(function (mutations) {
+		for (var i = 0; i < mutations.length; i++) {
+			if (mutations[i].addedNodes.length) {
+				removeUnwantedMenuItems();
+				break;
+			}
+		}
+	}).observe(document.body, { childList: true, subtree: true });
 
 })();
