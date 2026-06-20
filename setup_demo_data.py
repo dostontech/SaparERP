@@ -764,8 +764,9 @@ def configure_demo_ui(default_company):
 
     if frappe.db.exists("User", email):
         user = frappe.get_doc("User", email)
-        user.block_modules = [{"module": m} for m in BLOCK]
-        # Sync roles
+        user.set("block_modules", [])
+        for m in BLOCK:
+            user.append("block_modules", {"module": m})
         existing = {r.role for r in user.roles}
         for r in ROLES:
             if r not in existing:
