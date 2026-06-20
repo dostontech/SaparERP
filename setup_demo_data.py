@@ -711,29 +711,53 @@ def create_sales_invoices(cfg, count=15):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def configure_demo_ui(default_company):
-    """Hide unused workspaces and set default company for a clean demo."""
-    print("\n── UI Configuration ──────────────────────────")
+    """Create focused demo user; admin keeps full access."""
+    print("\n── Demo User Setup ───────────────────────────")
 
-    # Workspaces to keep visible
-    KEEP = {
-        "Accounting", "Buying", "Selling", "Stock",
-        "Payroll", "HR", "Home", "Settings",
-        "SaparERP Settings", "ERPNext Settings",
-    }
+    # Restore all workspaces so admin sees everything
+    frappe.db.sql("UPDATE `tabWorkspace` SET is_hidden = 0")
 
-    all_ws = frappe.db.get_all("Workspace", fields=["name", "is_hidden"])
-    hidden = 0
-    for ws in all_ws:
-        should_hide = ws.name not in KEEP
-        if should_hide and not ws.is_hidden:
-            frappe.db.set_value("Workspace", ws.name, "is_hidden", 1)
-            hidden += 1
-        elif not should_hide and ws.is_hidden:
-            frappe.db.set_value("Workspace", ws.name, "is_hidden", 0)
+    # Modules to block for the demo user
+    BLOCK = [
+        "Manufacturing", "Projects", "Assets", "CRM", "Support",
+        "Agriculture", "Education", "Healthcare", "Loan Management",
+        "Quality Management", "Non Profit", "ERPNext Integrations",
+        "Hospitality", "Retail",
+    ]
 
-    print(f"  OK  {hidden} workspace(s) hidden")
+    ROLES = [
+        "Accounts User", "Purchase User", "Sales User",
+        "Stock User", "HR User", "Payroll User",
+        "Sales Master Manager", "Purchase Master Manager",
+    ]
 
-    # Set default company
+    email = "demo@nursavdo.uz"
+
+    if frappe.db.exists("User", email):
+        user = frappe.get_doc("User", email)
+        user.block_modules = [{"module": m} for m in BLOCK]
+        user.save(ignore_permissions=True)
+        print(f"  OK  Demo user updated")
+    else:
+        user = frappe.get_doc({
+            "doctype": "User",
+            "email": email,
+            "first_name": "Nur Savdo",
+            "last_name": "Demo",
+            "username": "nursavdo",
+            "new_password": "demo123",
+            "send_welcome_email": 0,
+            "user_type": "System User",
+            "roles": [{"role": r} for r in ROLES],
+            "block_modules": [{"module": m} for m in BLOCK],
+        })
+        user.insert(ignore_permissions=True)
+        print(f"  OK  Demo user created: {email} / demo123")
+
+    # Set default company for demo user
+    frappe.defaults.set_user_default("company", default_company, user=email)
+
+    # Set global default company
     frappe.db.set_value("System Settings", "System Settings", "default_company", default_company)
     print(f"  OK  Default company → {default_company}")
 
