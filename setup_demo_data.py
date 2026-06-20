@@ -707,6 +707,40 @@ def create_sales_invoices(cfg, count=15):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  UI CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+def configure_demo_ui(default_company):
+    """Hide unused workspaces and set default company for a clean demo."""
+    print("\n── UI Configuration ──────────────────────────")
+
+    # Workspaces to keep visible
+    KEEP = {
+        "Accounting", "Buying", "Selling", "Stock",
+        "Payroll", "HR", "Home", "Settings",
+        "SaparERP Settings", "ERPNext Settings",
+    }
+
+    all_ws = frappe.db.get_all("Workspace", fields=["name", "is_hidden"])
+    hidden = 0
+    for ws in all_ws:
+        should_hide = ws.name not in KEEP
+        if should_hide and not ws.is_hidden:
+            frappe.db.set_value("Workspace", ws.name, "is_hidden", 1)
+            hidden += 1
+        elif not should_hide and ws.is_hidden:
+            frappe.db.set_value("Workspace", ws.name, "is_hidden", 0)
+
+    print(f"  OK  {hidden} workspace(s) hidden")
+
+    # Set default company
+    frappe.db.set_value("System Settings", "System Settings", "default_company", default_company)
+    print(f"  OK  Default company → {default_company}")
+
+    frappe.db.commit()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -855,7 +889,7 @@ def ensure_prerequisites():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--company", choices=["small", "large", "both"], default="both")
+    parser.add_argument("--company", choices=["small", "large", "both"], default="small")
     args = parser.parse_args()
 
     frappe.init(site=SITE, sites_path=SITES_PATH)
@@ -868,10 +902,14 @@ def main():
             setup_company(SMALL, "Small Company")
         if args.company in ("large", "both"):
             setup_company(LARGE, "Large Company")
+
+        default_co = SMALL["company_name"] if args.company in ("small", "both") else LARGE["company_name"]
+        configure_demo_ui(default_co)
+
         frappe.db.commit()
         print("=" * 55)
         print("  Demo data setup complete!")
-        print("  Login: http://localhost:8080  admin / admin")
+        print("  Login: http://159.89.170.98:8080  admin / admin")
         print("=" * 55)
     except Exception:
         frappe.db.rollback()
